@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>GYM TRACKER</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Chart.js 4.x -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Chart.js DataLabels Plugin (to show values directly on charts) -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    input, select, textarea {
+      font-size: 16px !important; /* Prevents auto-zoom in mobile Safari */
+    }
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 5px;
+    }
+    /* Smooth custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen pb-16">
+
+  <!-- Header: Strict GYM TRACKER title -->
+  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-lg shadow-sm">
+          <i class="fa-solid fa-dumbbell text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-extrabold leading-tight tracking-tight uppercase">GYM TRACKER</h1>
+          <p class="text-xs text-slate-400 font-medium">96-Session PT Package &amp; Visual Analytics</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="resetToInitialData()" title="Reset to initial 46 sessions" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-rotate-left"></i>
+          <span class="hidden sm:inline">Reset</span>
+        </button>
+        <button type="button" onclick="exportCSV()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow transition flex items-center gap-1.5">
+          <i class="fa-solid fa-download"></i>
+          <span>Export CSV</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- KPI Dashboard Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+        <span class="text-[11px] font-bold tracking-wider text-slate-400 uppercase">PT Attended</span>
+        <div class="mt-2 flex items-baseline justify-between">
+          <span id="kpi-pt-done" class="text-2xl sm:text-3xl font-extrabold text-blue-600">--</span>
+          <span class="text-xs font-semibold text-slate-400">/ 96</span>
+        </div>
+        <div class="mt-2.5 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+          <div id="kpi-bar" class="bg-blue-600 h-1.5 rounded-full" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+        <span class="text-[11px] font-bold tracking-wider text-slate-400 uppercase">PT Remaining</span>
+        <div class="mt-2 flex items-baseline justify-between">
+          <span id="kpi-pt-rem" class="text-2xl sm:text-3xl font-extrabold text-amber-600">--</span>
+          <span class="text-xs font-semibold text-slate-400">sessions</span>
+        </div>
+        <p class="mt-2.5 text-[11px] text-slate-400 truncate">Target: 96 total</p>
+      </div>
+
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+        <span class="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Total Gym Days</span>
+        <div class="mt-2 flex items-baseline justify-between">
+          <span id="kpi-gym-days" class="text-2xl sm:text-3xl font-extrabold text-emerald-600">--</span>
+          <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Active</span>
+        </div>
+        <p class="mt-2.5 text-[11px] text-slate-400 truncate">Excludes pure rest days</p>
+      </div>
+
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+        <span class="text-[11px] font-bold tracking-wider text-slate-400 uppercase">Total Time Logged</span>
+        <div class="mt-2 flex items-baseline justify-between">
+          <span id="kpi-total-mins" class="text-2xl sm:text-3xl font-extrabold text-slate-800">--</span>
+          <span class="text-xs font-semibold text-slate-400">mins</span>
+        </div>
+        <p id="kpi-hours" class="mt-2.5 text-[11px] text-slate-400 truncate">-- hrs</p>
+      </div>
+    </div>
+
+    <!-- Analytics & Visual Charts with Values & Names directly rendered -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 sm:p-6 space-y-6">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-chart-pie text-blue-600"></i>
+            Visual Analytics &amp; Value Breakdown
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Exact percentages and counts displayed directly on the graphs</p>
+        </div>
+        <span class="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">Live Values</span>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Chart 1: Workout Distribution (%) with values directly displayed -->
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/70 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wide">Workout Split %</h3>
+              <span class="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Values on Chart</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-0.5 mb-2">Direct share &amp; name distribution</p>
+          </div>
+          <div class="relative h-64 w-full flex items-center justify-center">
+            <canvas id="workoutDistChart"></canvas>
+          </div>
+          <p class="text-[11px] text-slate-500 text-center mt-2 font-medium">Slices labeled with Workout Split + %</p>
+        </div>
+
+        <!-- Chart 2: Monthly Attendance & PT with direct numbers on bars -->
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/70 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wide">Monthly Attendance</h3>
+              <span class="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">Bar Counts</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-0.5 mb-2">Gym Days vs Attended PT Sessions</p>
+          </div>
+          <div class="relative h-64 w-full">
+            <canvas id="monthlyTrendChart"></canvas>
+          </div>
+          <div class="text-[11px] text-slate-500 text-center border-t border-slate-200/60 pt-2 flex justify-around mt-2">
+            <span class="font-semibold text-emerald-600"><i class="fa-solid fa-square text-[10px] mr-1"></i>Total Gym Days</span>
+            <span class="font-semibold text-blue-600"><i class="fa-solid fa-square text-[10px] mr-1"></i>Attended PT</span>
+          </div>
+        </div>
+
+        <!-- Chart 3: Time Spent Day-of-Week with direct minutes on top -->
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200/70 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wide">Time Spent by Day</h3>
+              <span class="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Direct Mins</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-0.5 mb-2">Minutes trained per weekday (Mon - Sun)</p>
+          </div>
+          <div class="relative h-64 w-full">
+            <canvas id="dayOfWeekChart"></canvas>
+          </div>
+          <div class="text-[11px] text-slate-500 text-center border-t border-slate-200/60 pt-2 flex justify-between px-1 mt-2">
+            <span>Peak: <strong id="peakDayStat" class="text-slate-700 font-bold">—</strong></span>
+            <span>Avg: <strong id="avgDailyMinsStat" class="text-slate-700 font-bold">—</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Workout Split Showcase Area (Name, Count, % Share, Duration) -->
+      <div class="border-t border-slate-100 pt-5">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-1.5">
+            <i class="fa-solid fa-list-check text-blue-600"></i>
+            Workout Area &amp; Muscle Split Breakdown
+          </h3>
+          <span class="text-[11px] text-slate-400">All splits trained across logs</span>
+        </div>
+        <div id="workoutAreaShowcase" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          <!-- Dynamically populated workout split cards -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Attendance Calendar Section -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 sm:p-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-calendar-days text-blue-600"></i>
+            Attendance Calendar
+          </h2>
+          <span id="cal-month-title" class="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-lg">September 2026</span>
+        </div>
+        
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2.5 text-[11px] font-medium text-slate-500">
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Gym</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span> PT</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Rest</span>
+            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> Missed</span>
+          </div>
+          <div class="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+            <button type="button" onclick="changeMonth(-1)" class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white text-slate-600 transition"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+            <button type="button" onclick="jumpToCurrentMonth()" class="px-2 h-7 flex items-center justify-center rounded-md hover:bg-white text-xs font-semibold text-slate-600 transition">Today</button>
+            <button type="button" onclick="changeMonth(1)" class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white text-slate-600 transition"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cal-grid mb-1 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+      </div>
+
+      <div id="cal-cells" class="cal-grid">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Daily Entry Form -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 sm:p-6">
+      <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+        <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-calendar-plus text-blue-600"></i>
+          Daily Gym + PT Entry
+        </h2>
+        <span id="badge-next-pt" class="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">Package Session Next</span>
+      </div>
+
+      <form id="entry-form" onsubmit="saveEntry(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Date</label>
+          <input type="date" id="form-date" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Start Time</label>
+          <input type="text" id="form-time" value="05:15 AM" placeholder="e.g. 05:15 AM" oninput="autoCalcDuration(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Duration (Mins)</label>
+          <input type="number" id="form-duration" value="45" min="5" max="240" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Workout Split</label>
+          <select id="form-workout" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition">
+            <option value="" disabled selected>-- Select Workout Split --</option>
+            <option value="Core / Abs">Core / Abs</option>
+            <option value="Chest">Chest</option>
+            <option value="Shoulders">Shoulders</option>
+            <option value="Back">Back</option>
+            <option value="Biceps">Biceps</option>
+            <option value="Triceps">Triceps</option>
+            <option value="Legs">Legs</option>
+            <option value="Chest + Triceps">Chest + Triceps</option>
+            <option value="Back + Biceps">Back + Biceps</option>
+            <option value="Shoulders + Triceps">Shoulders + Triceps</option>
+            <option value="Chest + Shoulders">Chest + Shoulders</option>
+            <option value="Back + Rear Delts">Back + Rear Delts</option>
+            <option value="Legs + Core">Legs + Core</option>
+            <option value="Arms (Biceps + Triceps)">Arms (Biceps + Triceps)</option>
+            <option value="Full Body">Full Body</option>
+            <option value="Cardio &amp; HIIT">Cardio &amp; HIIT</option>
+            <option value="Functional / CrossFit">Functional / CrossFit</option>
+            <option value="Rest / Mobility">Rest / Mobility</option>
+          </select>
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Gym Notes</label>
+          <input type="text" id="form-gym-notes" placeholder="e.g. Core crunches, plank duration, sets, weight progression..." class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">PT Status</label>
+          <select id="form-pt-status" onchange="togglePtFields(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition">
+            <option value="Attended" selected>Attended</option>
+            <option value="Not Taken">Not Taken</option>
+            <option value="Missed">Missed</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">PT Session # (of 96)</label>
+          <input type="number" id="form-pt-number" min="1" max="96" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition">
+        </div>
+
+        <div class="sm:col-span-2 lg:col-span-3">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">PT Notes / Trainer Feedback</label>
+          <input type="text" id="form-pt-notes" placeholder="e.g. Mohan feedback, form corrections, core stability..." class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition">
+        </div>
+
+        <div class="sm:col-span-2 lg:col-span-1 flex items-end">
+          <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold py-2.5 px-4 rounded-xl shadow-sm transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-plus"></i>
+            <span>Log Daily Entry</span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Attendance History Table -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+      <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <h2 class="text-base font-bold text-slate-800">Daily Attendance History</h2>
+          <span id="history-count" class="text-xs font-semibold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">-- entries</span>
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <div class="relative w-full sm:w-64">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input type="text" id="search-input" oninput="renderTable()" placeholder="Search date, time, workout, notes..." class="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:bg-white focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs whitespace-nowrap">
+          <thead class="bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <tr>
+              <th class="py-3 px-4">Date</th>
+              <th class="py-3 px-3">Time</th>
+              <th class="py-3 px-3">Workout</th>
+              <th class="py-3 px-3">Duration</th>
+              <th class="py-3 px-3">Gym Notes</th>
+              <th class="py-3 px-3">PT Status</th>
+              <th class="py-3 px-3 text-center">PT # (of 96)</th>
+              <th class="py-3 px-3">PT Notes</th>
+              <th class="py-3 px-4 text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="attendance-tbody" class="divide-y divide-slate-100 font-medium text-slate-700">
+            <!-- Rendered by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Summary Modal -->
+  <div id="summary-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 sm:p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-circle-info text-blue-600"></i>
+          <h3 class="font-bold text-base text-slate-800">Daily Attendance Summary</h3>
+        </div>
+        <button type="button" onclick="closeSummaryModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div id="summary-content" class="space-y-3 text-xs">
+        <!-- Injected by JS -->
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button type="button" onclick="closeSummaryModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition">Close</button>
+        <button type="button" id="summary-edit-btn" class="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition">Edit This Date</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="edit-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5 sm:p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-base text-slate-800">Edit Attendance Record</h3>
+        <button type="button" onclick="closeEditModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <input type="hidden" id="edit-index">
+
+      <div class="grid grid-cols-2 gap-3 text-xs">
+        <div>
+          <label class="block font-bold text-slate-500 uppercase mb-1">Date</label>
+          <input type="date" id="edit-date" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none focus:border-blue-500">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-500 uppercase mb-1">Time</label>
+          <input type="text" id="edit-time" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none focus:border-blue-500">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-500 uppercase mb-1">Duration (min)</label>
+          <input type="number" id="edit-duration" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none focus:border-blue-500">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-500 uppercase mb-1">Workout</label>
+          <select id="edit-workout" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none focus:border-blue-500">
+            <option value="—">—</option>
+            <option value="Core / Abs">Core / Abs</option>
+            <option value="Chest">Chest</option>
+            <option value="Shoulders">Shoulders</option>
+            <option value="Back">Back</option>
+            <option value="Biceps">Biceps</option>
+            <option value="Triceps">Triceps</option>
+            <option value="Legs">Legs</option>
+            <option value="Chest + Triceps">Chest + Triceps</option>
+            <option value="Back + Biceps">Back + Biceps</option>
+            <option value="Shoulders + Triceps">Shoulders + Triceps</option>
+            <option value="Chest + Shoulders">Chest + Shoulders</option>
+            <option value="Back + Rear Delts">Back + Rear Delts</option>
+            <option value="Legs + Core">Legs + Core</option>
+            <option value="Arms (Biceps + Triceps)">Arms (Biceps + Triceps)</option>
+            <option value="Full Body">Full Body</option>
+            <option value="Cardio &amp; HIIT">Cardio &amp; HIIT</option>
+            <option value="Functional / CrossFit">Functional / CrossFit</option>
+            <option value="Rest / Mobility">Rest / Mobility</option>
+          </select>
+        </div>
+        <div class="col-span-2">
+          <label class="block font-bold text-slate-500 uppercase mb-1">Gym Notes</label>
+          <input type="text" id="edit-gym-notes" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none focus:border-blue-500">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-500 uppercase mb-1">PT Status</label>
+          <select id="edit-pt-status" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none focus:border-blue-500">
+            <option value="Attended">Attended</option>
+            <option value="Not Taken">Not Taken</option>
+            <option value="Missed">Missed</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-bold text-slate-500 uppercase mb-1">PT Session # (of 96)</label>
+          <input type="number" id="edit-pt-num" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none focus:border-blue-500">
+        </div>
+        <div class="col-span-2">
+          <label class="block font-bold text-slate-500 uppercase mb-1">PT Notes</label>
+          <input type="text" id="edit-pt-notes" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 focus:outline-none focus:border-blue-500">
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button type="button" onclick="closeEditModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition">Cancel</button>
+        <button type="button" onclick="commitEdit()" class="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Register the DataLabels plugin with Chart.js
+    if (typeof ChartDataLabels !== 'undefined') {
+      Chart.register(ChartDataLabels);
+    }
+
+    const STORAGE_KEY = 'slam_gym_pt_tracker_v6_datalabels';
+
+    // Base historical 46 attended sessions from SLAM tracking sheets (Mohan)
+    const INITIAL_RECORDS = [
+      { date: "2026-07-08", time: "05:00 AM", duration: 60, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 1, ptNotes: "—" },
+      { date: "2026-07-10", time: "05:00 AM", duration: 60, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 2, ptNotes: "—" },
+      { date: "2026-07-11", time: "06:30 AM", duration: 60, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 3, ptNotes: "—" },
+      { date: "2026-07-14", time: "05:00 AM", duration: 60, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 4, ptNotes: "—" },
+      { date: "2026-07-16", time: "05:00 AM", duration: 60, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 5, ptNotes: "—" },
+      { date: "2026-07-17", time: "05:10 AM", duration: 50, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 6, ptNotes: "—" },
+      { date: "2026-07-18", time: "09:15 AM", duration: 60, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 7, ptNotes: "—" },
+      { date: "2026-07-20", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 8, ptNotes: "—" },
+      { date: "2026-07-21", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 9, ptNotes: "—" },
+      { date: "2026-07-24", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 10, ptNotes: "—" },
+      { date: "2026-07-25", time: "11:30 AM", duration: 60, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 11, ptNotes: "—" },
+      { date: "2026-07-27", time: "05:00 AM", duration: 60, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 12, ptNotes: "—" },
+      { date: "2026-07-28", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 13, ptNotes: "—" },
+      { date: "2026-07-29", time: "05:21 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 14, ptNotes: "—" },
+      { date: "2026-07-30", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 15, ptNotes: "—" },
+      { date: "2026-07-31", time: "05:20 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 16, ptNotes: "—" },
+      { date: "2026-08-01", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 17, ptNotes: "—" },
+      { date: "2026-08-04", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 18, ptNotes: "—" },
+      { date: "2026-08-05", time: "05:00 AM", duration: 60, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 19, ptNotes: "—" },
+      { date: "2026-08-08", time: "07:00 AM", duration: 60, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 20, ptNotes: "—" },
+      { date: "2026-08-10", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 21, ptNotes: "—" },
+      { date: "2026-08-11", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 22, ptNotes: "—" },
+      { date: "2026-08-12", time: "05:00 AM", duration: 60, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 23, ptNotes: "—" },
+      { date: "2026-08-13", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 24, ptNotes: "—" },
+      { date: "2026-08-14", time: "05:20 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 25, ptNotes: "—" },
+      { date: "2026-08-15", time: "05:30 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 26, ptNotes: "—" },
+      { date: "2026-08-19", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 27, ptNotes: "—" },
+      { date: "2026-08-20", time: "05:30 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 28, ptNotes: "—" },
+      { date: "2026-08-21", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 29, ptNotes: "—" },
+      { date: "2026-08-22", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 30, ptNotes: "—" },
+      { date: "2026-08-25", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 31, ptNotes: "—" },
+      { date: "2026-08-26", time: "05:12 AM", duration: 48, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 32, ptNotes: "—" },
+      { date: "2026-08-27", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 33, ptNotes: "—" },
+      { date: "2026-08-28", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 34, ptNotes: "—" },
+      { date: "2026-08-29", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 35, ptNotes: "—" },
+      { date: "2026-09-01", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 36, ptNotes: "—" },
+      { date: "2026-09-02", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 37, ptNotes: "—" },
+      { date: "2026-09-05", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 38, ptNotes: "—" },
+      { date: "2026-09-06", time: "05:30 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 39, ptNotes: "—" },
+      { date: "2026-09-07", time: "05:20 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 40, ptNotes: "—" },
+      { date: "2026-09-09", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 41, ptNotes: "—" },
+      { date: "2026-09-10", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 42, ptNotes: "—" },
+      { date: "2026-09-11", time: "05:45 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 43, ptNotes: "—" },
+      { date: "2026-09-16", time: "05:20 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 44, ptNotes: "—" },
+      { date: "2026-09-18", time: "05:00 AM", duration: 60, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 45, ptNotes: "—" },
+      { date: "2026-09-22", time: "05:15 AM", duration: 45, workout: "—", gymNotes: "—", ptStatus: "Attended", ptNumber: 46, ptNotes: "—" }
+    ];
+
+    let records = [];
+    let currentCalDate = new Date(2026, 8, 1); // Set to September 2026
+
+    // Chart instances
+    let chartWorkoutDist = null;
+    let chartMonthlyTrend = null;
+    let chartDayOfWeek = null;
+
+    function loadRecords() {
+      const keysToTry = ['slam_gym_pt_tracker_v6_datalabels', 'slam_gym_pt_tracker_v5', 'slam_gym_pt_tracker_v4_clean', 'slam_gym_pt_tracker_v3_clean', 'slam_gym_pt_tracker_data'];
+      let stored = null;
+      for (const k of keysToTry) {
+        stored = localStorage.getItem(k);
+        if (stored) break;
+      }
+
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            records = parsed;
+          } else {
+            records = [...INITIAL_RECORDS];
+          }
+        } catch (e) {
+          records = [...INITIAL_RECORDS];
+        }
+      } else {
+        records = [...INITIAL_RECORDS];
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+
+      updateDashboard();
+      renderCalendar();
+      renderTable();
+      renderChartsAndShowcase();
+      updateFormDefaults();
+    }
+
+    function resetToInitialData() {
+      if (confirm("Reset records back to the 46 baseline sessions? (Any custom logs will be overwritten)")) {
+        records = [...INITIAL_RECORDS];
+        saveToStorage();
+      }
+    }
+
+    function saveToStorage() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+      updateDashboard();
+      renderCalendar();
+      renderTable();
+      renderChartsAndShowcase();
+      updateFormDefaults();
+    }
+
+    function autoCalcDuration(timeStr) {
+      if (!timeStr) return;
+      const clean = timeStr.trim().toLowerCase();
+      const durInput = document.getElementById('form-duration');
+      if (clean.includes('5:15') || clean.includes('05:15')) {
+        durInput.value = 45;
+      } else if (clean.includes('5:00') || clean.includes('05:00')) {
+        durInput.value = 60;
+      }
+    }
+
+    function togglePtFields(status) {
+      const ptNumInput = document.getElementById('form-pt-number');
+      if (status === 'Not Taken' || status === 'Missed') {
+        ptNumInput.value = '';
+        ptNumInput.disabled = true;
+      } else {
+        ptNumInput.disabled = false;
+        const maxNum = records.reduce((max, r) => Math.max(max, parseInt(r.ptNumber) || 0), 0);
+        ptNumInput.value = maxNum + 1;
+      }
+    }
+
+    function updateFormDefaults() {
+      const formDate = document.getElementById('form-date');
+      if (!formDate.value) formDate.value = "2026-09-23";
+
+      const maxPt = records.reduce((max, r) => Math.max(max, parseInt(r.ptNumber) || 0), 0);
+      const nextPt = maxPt + 1;
+      const ptNumInput = document.getElementById('form-pt-number');
+      const badge = document.getElementById('badge-next-pt');
+
+      if (document.getElementById('form-pt-status').value === 'Attended') {
+        ptNumInput.value = nextPt;
+      }
+      badge.innerText = `Package #${nextPt} Next`;
+    }
+
+    function updateDashboard() {
+      const attended = records.filter(r => r.ptStatus === 'Attended').length;
+      const remaining = Math.max(0, 96 - attended);
+
+      // Exact gym days: (Active workout OR PT attended) without double counting
+      const gymDays = records.filter(r => {
+        const didWorkout = r.workout && r.workout !== 'Rest / Mobility' && r.workout !== '—';
+        const didPt = r.ptStatus === 'Attended';
+        const isHistoricalAttended = r.workout === '—' && r.ptStatus === 'Attended';
+        return didWorkout || didPt || isHistoricalAttended;
+      }).length;
+
+      const totalMins = records.reduce((sum, r) => sum + (parseInt(r.duration) || 0), 0);
+
+      document.getElementById('kpi-pt-done').innerText = attended;
+      document.getElementById('kpi-pt-rem').innerText = remaining;
+      document.getElementById('kpi-gym-days').innerText = gymDays;
+      document.getElementById('kpi-total-mins').innerText = totalMins.toLocaleString();
+      document.getElementById('kpi-bar').style.width = ((attended / 96) * 100).toFixed(1) + '%';
+      
+      const hrs = (totalMins / 60).toFixed(1);
+      const avg = records.length ? (totalMins / records.length).toFixed(1) : 0;
+      document.getElementById('kpi-hours').innerText = `~${hrs} hrs (~${avg}m avg)`;
+      document.getElementById('history-count').innerText = `${records.length} entries`;
+    }
+
+    function renderChartsAndShowcase() {
+      // Color palette for splits
+      const colors = [
+        '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
+        '#EC4899', '#06B6D4', '#14B8A6', '#84CC16', '#6366F1', 
+        '#F97316', '#64748B', '#A855F7', '#E11D48', '#0D9488',
+        '#475569', '#2563EB', '#059669', '#D97706'
+      ];
+
+      // 1. Calculate workout distribution, minutes, and share
+      const splitStats = {};
+      let totalWorkoutsLogged = 0;
+
+      records.forEach(r => {
+        const w = (r.workout && r.workout.trim() !== '') ? r.workout : 'Unspecified';
+        if (!splitStats[w]) {
+          splitStats[w] = { count: 0, totalMins: 0 };
+        }
+        splitStats[w].count += 1;
+        splitStats[w].totalMins += (parseInt(r.duration) || 0);
+        totalWorkoutsLogged += 1;
+      });
+
+      const workoutLabels = Object.keys(splitStats);
+      const workoutCounts = workoutLabels.map(k => splitStats[k].count);
+
+      // Render Chart 1: Workout Distribution with DIRECT SLICE LABELS
+      const ctxDist = document.getElementById('workoutDistChart').getContext('2d');
+      if (chartWorkoutDist) chartWorkoutDist.destroy();
+
+      chartWorkoutDist = new Chart(ctxDist, {
+        type: 'doughnut',
+        data: {
+          labels: workoutLabels,
+          datasets: [{
+            data: workoutCounts,
+            backgroundColor: colors.slice(0, workoutLabels.length),
+            borderWidth: 2,
+            borderColor: '#ffffff'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            datalabels: {
+              display: function(context) {
+                const val = context.dataset.data[context.dataIndex];
+                const pct = totalWorkoutsLogged > 0 ? (val / totalWorkoutsLogged) : 0;
+                return pct >= 0.04; // Only show on slices that are >= 4% so labels stay legible
+              },
+              color: '#ffffff',
+              font: {
+                weight: 'bold',
+                size: 11
+              },
+              formatter: function(value, context) {
+                const label = context.chart.data.labels[context.dataIndex] || '';
+                const pct = totalWorkoutsLogged > 0 ? ((value / totalWorkoutsLogged) * 100).toFixed(0) : 0;
+                // Compact label for doughnut slice
+                const shortLabel = label.length > 9 ? label.substring(0, 8) + '..' : label;
+                return `${shortLabel}\n${pct}% (${value})`;
+              },
+              textAlign: 'center',
+              textShadowBlur: 4,
+              textShadowColor: 'rgba(0,0,0,0.6)'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const val = context.raw || 0;
+                  const pct = totalWorkoutsLogged > 0 ? ((val / totalWorkoutsLogged) * 100).toFixed(1) : 0;
+                  return ` ${context.label}: ${val} sessions (${pct}%)`;
+                }
+              }
+            }
+          },
+          cutout: '58%'
+        }
+      });
+
+      // Render Workout Split Showcase in Workout Area
+      const showcaseContainer = document.getElementById('workoutAreaShowcase');
+      showcaseContainer.innerHTML = '';
+
+      workoutLabels.forEach((splitName, idx) => {
+        const item = splitStats[splitName];
+        const pct = totalWorkoutsLogged > 0 ? ((item.count / totalWorkoutsLogged) * 100).toFixed(1) : '0';
+        const color = colors[idx % colors.length];
+
+        const card = document.createElement('div');
+        card.className = 'bg-slate-50 border border-slate-200/90 rounded-xl p-3 flex flex-col justify-between hover:shadow-sm transition';
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="inline-flex items-center gap-1.5 font-bold text-slate-800 text-xs">
+                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: ${color}"></span>
+                <span class="truncate" title="${splitName}">${splitName}</span>
+              </span>
+              <span class="text-[11px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">${pct}%</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden mb-2">
+              <div class="h-1.5 rounded-full" style="width: ${pct}%; background-color: ${color}"></div>
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60 font-medium">
+            <span><strong>${item.count}</strong> session${item.count === 1 ? '' : 's'}</span>
+            <span><i class="fa-regular fa-clock mr-1 text-slate-400"></i>${item.totalMins}m</span>
+          </div>
+        `;
+        showcaseContainer.appendChild(card);
+      });
+
+      // 2. Monthly Trend Chart with EXACT VALUES ON TOP OF BARS
+      const monthlyGym = {};
+      const monthlyPt = {};
+
+      records.forEach(r => {
+        if (!r.date) return;
+        const [yr, mo] = r.date.split('-');
+        const monthKey = `${yr}-${mo}`;
+        const didGym = (r.workout && r.workout !== 'Rest / Mobility' && r.workout !== '—') || r.ptStatus === 'Attended';
+        const didPt = r.ptStatus === 'Attended';
+
+        if (!monthlyGym[monthKey]) monthlyGym[monthKey] = 0;
+        if (!monthlyPt[monthKey]) monthlyPt[monthKey] = 0;
+
+        if (didGym) monthlyGym[monthKey]++;
+        if (didPt) monthlyPt[monthKey]++;
+      });
+
+      const sortedMonths = Object.keys(monthlyGym).sort();
+      const monthDisplayLabels = sortedMonths.map(m => {
+        const [y, mo] = m.split('-');
+        const dateObj = new Date(parseInt(y), parseInt(mo) - 1, 1);
+        return dateObj.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      });
+
+      const gymSeries = sortedMonths.map(m => monthlyGym[m]);
+      const ptSeries = sortedMonths.map(m => monthlyPt[m]);
+
+      const ctxTrend = document.getElementById('monthlyTrendChart').getContext('2d');
+      if (chartMonthlyTrend) chartMonthlyTrend.destroy();
+
+      chartMonthlyTrend = new Chart(ctxTrend, {
+        type: 'bar',
+        data: {
+          labels: monthDisplayLabels,
+          datasets: [
+            {
+              label: 'Gym Days',
+              data: gymSeries,
+              backgroundColor: '#10B981',
+              borderRadius: 6,
+              datalabels: {
+                anchor: 'end',
+                align: 'top',
+                color: '#047857',
+                font: { weight: 'bold', size: 11 },
+                formatter: (val) => val > 0 ? val : ''
+              }
+            },
+            {
+              label: 'Attended PT',
+              data: ptSeries,
+              backgroundColor: '#3B82F6',
+              borderRadius: 6,
+              datalabels: {
+                anchor: 'end',
+                align: 'top',
+                color: '#1d4ed8',
+                font: { weight: 'bold', size: 11 },
+                formatter: (val) => val > 0 ? val : ''
+              }
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {
+            padding: { top: 16 }
+          },
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0, font: { size: 10 } },
+              grid: { color: '#e2e8f0' }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { font: { size: 10, weight: 'bold' } }
+            }
+          }
+        }
+      });
+
+      // 3. Time Spent by Day of the Week with DIRECT MINUTES ON TOP
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayMinutes = [0, 0, 0, 0, 0, 0, 0];
+
+      records.forEach(r => {
+        if (!r.date) return;
+        const [y, m, d] = r.date.split('-').map(Number);
+        const dayIdx = new Date(y, m - 1, d).getDay();
+        const mins = parseInt(r.duration) || 0;
+        dayMinutes[dayIdx] += mins;
+      });
+
+      const orderedLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const orderedIndices = [1, 2, 3, 4, 5, 6, 0];
+      const orderedMins = orderedIndices.map(i => dayMinutes[i]);
+
+      let maxMins = -1;
+      let peakDay = '—';
+      orderedIndices.forEach(origIdx => {
+        if (dayMinutes[origIdx] > maxMins && dayMinutes[origIdx] > 0) {
+          maxMins = dayMinutes[origIdx];
+          peakDay = dayNames[origIdx];
+        }
+      });
+      document.getElementById('peakDayStat').innerText = peakDay;
+
+      const totalActiveSessions = records.filter(r => (parseInt(r.duration) || 0) > 0).length;
+      const totalAllMins = records.reduce((acc, r) => acc + (parseInt(r.duration) || 0), 0);
+      const avgSessionMins = totalActiveSessions > 0 ? (totalAllMins / totalActiveSessions).toFixed(0) : 0;
+      document.getElementById('avgDailyMinsStat').innerText = `${avgSessionMins}m / session`;
+
+      const ctxDay = document.getElementById('dayOfWeekChart').getContext('2d');
+      if (chartDayOfWeek) chartDayOfWeek.destroy();
+
+      chartDayOfWeek = new Chart(ctxDay, {
+        type: 'bar',
+        data: {
+          labels: orderedLabels,
+          datasets: [{
+            label: 'Minutes',
+            data: orderedMins,
+            backgroundColor: '#6366F1',
+            borderRadius: 6,
+            datalabels: {
+              anchor: 'end',
+              align: 'top',
+              color: '#4338ca',
+              font: { weight: 'bold', size: 10 },
+              formatter: (val) => val > 0 ? `${val}m` : '0m'
+            }
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: {
+            padding: { top: 16 }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => ` ${ctx.raw} mins logged`
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { font: { size: 10 } },
+              grid: { color: '#e2e8f0' }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { font: { size: 10, weight: 'bold' } }
+            }
+          }
+        }
+      });
+    }
+
+    function changeMonth(delta) {
+      currentCalDate.setMonth(currentCalDate.getMonth() + delta);
+      renderCalendar();
+    }
+
+    function jumpToCurrentMonth() {
+      currentCalDate = new Date(2026, 8, 1);
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const year = currentCalDate.getFullYear();
+      const month = currentCalDate.getMonth();
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      document.getElementById('cal-month-title').innerText = `${monthNames[month]} ${year}`;
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const calCells = document.getElementById('cal-cells');
+      calCells.innerHTML = '';
+
+      for (let i = 0; i < firstDay; i++) {
+        const blank = document.createElement('div');
+        blank.className = 'h-16 sm:h-20 bg-slate-50/50 rounded-xl border border-slate-100/50';
+        calCells.appendChild(blank);
+      }
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const record = records.find(r => r.date === dateStr);
+
+        const cell = document.createElement('div');
+        cell.className = 'h-16 sm:h-20 bg-white rounded-xl border border-slate-200/80 p-1.5 flex flex-col justify-between cursor-pointer hover:border-blue-400 hover:shadow-sm transition-all';
+        cell.onclick = () => openSummaryForDate(dateStr);
+
+        let badgeHtml = '';
+        if (record) {
+          const isPt = record.ptStatus === 'Attended';
+          const isGym = record.workout && record.workout !== 'Rest / Mobility' && record.workout !== '—';
+          const isRest = record.workout === 'Rest / Mobility';
+          const isMissed = record.ptStatus === 'Missed';
+
+          badgeHtml = `
+            <div class="flex flex-wrap gap-1 mt-1">
+              ${isGym ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Gym</span>' : ''}
+              ${isPt ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">PT #${record.ptNumber || ''}</span>` : ''}
+              ${isRest ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">Rest</span>' : ''}
+              ${isMissed ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">Missed</span>' : ''}
+            </div>
+          `;
+        }
+
+        cell.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold ${record ? 'text-slate-800' : 'text-slate-400'}">${d}</span>
+            ${record ? '<span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>' : ''}
+          </div>
+          ${badgeHtml}
+        `;
+        calCells.appendChild(cell);
+      }
+    }
+
+    function openSummaryForDate(dateStr) {
+      const idx = records.findIndex(r => r.date === dateStr);
+      const content = document.getElementById('summary-content');
+      const editBtn = document.getElementById('summary-edit-btn');
+
+      if (idx !== -1) {
+        const r = records[idx];
+        content.innerHTML = `
+          <div class="p-3 bg-slate-50 rounded-xl space-y-2">
+            <div class="flex justify-between border-b border-slate-200/60 pb-1.5">
+              <span class="text-slate-500 font-semibold">Date:</span>
+              <span class="font-bold text-slate-800">${r.date}</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-200/60 pb-1.5">
+              <span class="text-slate-500 font-semibold">Time &amp; Duration:</span>
+              <span class="font-bold text-slate-800">${r.time || '—'} (${r.duration} min)</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-200/60 pb-1.5">
+              <span class="text-slate-500 font-semibold">Workout Split:</span>
+              <span class="font-bold text-emerald-600">${r.workout || '—'}</span>
+            </div>
+            <div class="flex justify-between border-b border-slate-200/60 pb-1.5">
+              <span class="text-slate-500 font-semibold">PT Status:</span>
+              <span class="font-bold text-blue-600">${r.ptStatus} ${r.ptNumber ? '(Session #' + r.ptNumber + ' of 96)' : ''}</span>
+            </div>
+            <div>
+              <span class="text-slate-500 font-semibold block mb-0.5">Gym Notes:</span>
+              <p class="text-slate-700 bg-white p-2 rounded-lg border border-slate-200">${r.gymNotes || '—'}</p>
+            </div>
+            <div>
+              <span class="text-slate-500 font-semibold block mb-0.5">PT Notes:</span>
+              <p class="text-slate-700 bg-white p-2 rounded-lg border border-slate-200">${r.ptNotes || '—'}</p>
+            </div>
+          </div>
+        `;
+        editBtn.style.display = 'block';
+        editBtn.innerText = 'Edit This Date';
+        editBtn.onclick = () => {
+          closeSummaryModal();
+          openEditModal(idx);
+        };
+      } else {
+        content.innerHTML = `
+          <div class="p-6 text-center text-slate-500 space-y-2">
+            <i class="fa-solid fa-calendar-xmark text-2xl text-slate-300"></i>
+            <p>No entry logged for <strong class="text-slate-700">${dateStr}</strong>.</p>
+          </div>
+        `;
+        editBtn.style.display = 'block';
+        editBtn.innerText = 'Log for This Date';
+        editBtn.onclick = () => {
+          closeSummaryModal();
+          document.getElementById('form-date').value = dateStr;
+          document.getElementById('entry-form').scrollIntoView({ behavior: 'smooth' });
+        };
+      }
+
+      document.getElementById('summary-modal').classList.remove('hidden');
+    }
+
+    function closeSummaryModal() {
+      document.getElementById('summary-modal').classList.add('hidden');
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('attendance-tbody');
+      const query = document.getElementById('search-input').value.toLowerCase().trim();
+      tbody.innerHTML = '';
+
+      const sorted = [...records].map((rec, origIdx) => ({ ...rec, origIdx })).sort((a, b) => b.date.localeCompare(a.date));
+
+      const filtered = sorted.filter(r => 
+        (r.date && r.date.toLowerCase().includes(query)) ||
+        (r.workout && r.workout.toLowerCase().includes(query)) ||
+        (r.ptStatus && r.ptStatus.toLowerCase().includes(query)) ||
+        (r.gymNotes && r.gymNotes.toLowerCase().includes(query)) ||
+        (r.ptNotes && r.ptNotes.toLowerCase().includes(query))
+      );
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="py-8 text-center text-slate-400">No matching attendance records found.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach(r => {
+        const isAttended = r.ptStatus === 'Attended';
+        const badgeClass = isAttended ? 'bg-blue-50 text-blue-700 border-blue-200' : (r.ptStatus === 'Missed' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-100 text-slate-600 border-slate-200');
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50/80 transition-colors';
+        tr.innerHTML = `
+          <td class="py-3.5 px-4 font-bold text-blue-600 cursor-pointer hover:underline" onclick="openSummaryForDate('${r.date}')">${r.date}</td>
+          <td class="py-3.5 px-3 text-slate-500">${r.time || '—'}</td>
+          <td class="py-3.5 px-3">
+            <span class="inline-flex items-center gap-1.5 font-semibold text-slate-800">
+              <span class="w-2 h-2 rounded-full ${r.workout === 'Rest / Mobility' ? 'bg-amber-400' : (r.workout === '—' ? 'bg-slate-300' : 'bg-emerald-500')}"></span>
+              ${r.workout || '—'}
+            </span>
+          </td>
+          <td class="py-3.5 px-3 text-slate-600">${r.duration ? r.duration + ' min' : '—'}</td>
+          <td class="py-3.5 px-3 text-slate-500 max-w-[180px] truncate">${r.gymNotes || '—'}</td>
+          <td class="py-3.5 px-3">
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${badgeClass}">
+              ${r.ptStatus}
+            </span>
+          </td>
+          <td class="py-3.5 px-3 text-center font-bold text-blue-600">${r.ptNumber ? '#' + r.ptNumber + ' / 96' : '—'}</td>
+          <td class="py-3.5 px-3 text-slate-500 max-w-[200px] truncate">${r.ptNotes || '—'}</td>
+          <td class="py-3.5 px-4 text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <button type="button" onclick="openEditModal(${r.origIdx})" class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition" title="Edit">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button type="button" onclick="deleteEntry(${r.origIdx})" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="Delete">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function saveEntry(e) {
+      e.preventDefault();
+      const status = document.getElementById('form-pt-status').value;
+      const ptNumVal = document.getElementById('form-pt-number').value;
+
+      const newEntry = {
+        date: document.getElementById('form-date').value,
+        time: document.getElementById('form-time').value,
+        duration: parseInt(document.getElementById('form-duration').value) || 45,
+        workout: document.getElementById('form-workout').value,
+        gymNotes: document.getElementById('form-gym-notes').value || '—',
+        ptStatus: status,
+        ptNumber: (status === 'Attended' && ptNumVal) ? parseInt(ptNumVal) : null,
+        ptNotes: document.getElementById('form-pt-notes').value || '—'
+      };
+
+      records.push(newEntry);
+      saveToStorage();
+
+      document.getElementById('form-gym-notes').value = '';
+      document.getElementById('form-pt-notes').value = '';
+      document.getElementById('form-workout').selectedIndex = 0;
+    }
+
+    function openEditModal(idx) {
+      const r = records[idx];
+      document.getElementById('edit-index').value = idx;
+      document.getElementById('edit-date').value = r.date;
+      document.getElementById('edit-time').value = r.time || '';
+      document.getElementById('edit-duration').value = r.duration || '';
+      document.getElementById('edit-workout').value = r.workout || '—';
+      document.getElementById('edit-gym-notes').value = r.gymNotes === '—' ? '' : r.gymNotes;
+      document.getElementById('edit-pt-status').value = r.ptStatus;
+      document.getElementById('edit-pt-num').value = r.ptNumber || '';
+      document.getElementById('edit-pt-notes').value = r.ptNotes === '—' ? '' : r.ptNotes;
+
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.add('hidden');
+    }
+
+    function commitEdit() {
+      const idx = parseInt(document.getElementById('edit-index').value);
+      const status = document.getElementById('edit-pt-status').value;
+      const ptNum = document.getElementById('edit-pt-num').value;
+
+      records[idx] = {
+        date: document.getElementById('edit-date').value,
+        time: document.getElementById('edit-time').value,
+        duration: parseInt(document.getElementById('edit-duration').value) || 0,
+        workout: document.getElementById('edit-workout').value,
+        gymNotes: document.getElementById('edit-gym-notes').value || '—',
+        ptStatus: status,
+        ptNumber: (status === 'Attended' && ptNum) ? parseInt(ptNum) : null,
+        ptNotes: document.getElementById('edit-pt-notes').value || '—'
+      };
+
+      closeEditModal();
+      saveToStorage();
+    }
+
+    function deleteEntry(idx) {
+      if (confirm(`Delete the entry for ${records[idx].date}?`)) {
+        records.splice(idx, 1);
+        saveToStorage();
+      }
+    }
+
+    function exportCSV() {
+      let csvContent = "data:text/csv;charset=utf-8,Date,Time,Workout,Duration(mins),Gym Notes,PT Status,PT Session #,PT Notes\n";
+      records.forEach(r => {
+        csvContent += `"${r.date}","${r.time}","${r.workout}","${r.duration}","${r.gymNotes}","${r.ptStatus}","${r.ptNumber || ''}","${r.ptNotes}"\n`;
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "GYM_TRACKER_Attendance.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Auto-load on document readiness
+    window.addEventListener('DOMContentLoaded', () => {
+      loadRecords();
+    });
+  </script>
+</body>
+</html>
